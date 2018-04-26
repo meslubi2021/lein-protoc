@@ -249,11 +249,16 @@
   [jar-string]
   (URI. "jar:file" (-> (File. jar-string) .toURI .getPath) nil))
 
+(defn get-jar-fs
+  [^URI path]
+  (try
+    (FileSystems/newFileSystem path {})
+    (catch java.nio.file.FileSystemAlreadyExistsException e
+      (FileSystems/getFileSystem path))))
+
 (defn unpack-jar!
   [proto-jar]
-  (with-open [proto-jar-fs (FileSystems/newFileSystem
-                             ^URI (jar-uri proto-jar)
-                             {})]
+  (with-open [proto-jar-fs ^java.nio.file.FileSystem (get-jar-fs (jar-uri proto-jar))]
     (let [src-path (.getPath proto-jar-fs "/" (vargs String))
           tgt-path (Files/createTempDirectory
                      "lein-protoc"
