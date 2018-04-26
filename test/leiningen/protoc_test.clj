@@ -53,3 +53,10 @@
     (lp/protoc grpc-project)
     (t/is (.exists grpc-java-file-1))
     (t/is (.exists grpc-java-file-2))))
+
+(t/deftest get-jar-fs-test
+  (t/testing "Can open the same JAR twice"
+    (let [path (lp/jar-uri "dev-resources/empty.jar")]
+      (with-open [proto-jar-fs ^java.nio.file.FileSystem (lp/get-jar-fs path)]
+        (with-open [second-proto-jar-fs ^java.nio.file.FileSystem (lp/get-jar-fs path)]
+          (t/is (= proto-jar-fs second-proto-jar-fs)))))))
