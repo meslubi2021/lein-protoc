@@ -1,4 +1,4 @@
-(defproject lein-protoc "0.4.1"
+(defproject lein-protoc "0.4.2"
   :description "Leiningen plugin for compiling Protocol Buffers"
   :url "https://github.com/LiaisonTechnologies/lein-protoc"
   :license {:name "Eclipse Public License"
