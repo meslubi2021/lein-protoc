@@ -98,11 +98,11 @@
 
 (defn build-cmd
   [{:keys [protoc-exe protoc-grpc-exe]}
-   {:keys [proto-source-paths builtin-proto-path]}
+   {:keys [proto-source-paths builtin-proto-path proto-dep-paths]}
    {:keys [proto-target-path grpc-target-path]}]
-  (let [all-srcs        (if builtin-proto-path
-                          (conj proto-source-paths builtin-proto-path)
-                          proto-source-paths)
+  (let [all-srcs        (concat proto-dep-paths (if builtin-proto-path
+                                                  (conj proto-source-paths builtin-proto-path)
+                                                  proto-source-paths))
         src-paths-args  (map str->src-path-arg all-srcs)
         target-path-arg (str "--java_out="
                              (resolve-target-path! proto-target-path))
@@ -246,7 +246,7 @@
         (Paths/get (vargs String)))))
 
 (defn jar-uri
-  [jar-string]
+  [^String jar-string]
   (URI. "jar:file" (-> (File. jar-string) .toURI .getPath) nil))
 
 (defn get-jar-fs
@@ -257,9 +257,10 @@
       (FileSystems/getFileSystem path))))
 
 (defn unpack-jar!
-  [proto-jar]
+  [proto-jar proto-path]
   (with-open [proto-jar-fs ^java.nio.file.FileSystem (get-jar-fs (jar-uri proto-jar))]
-    (let [src-path (.getPath proto-jar-fs "/" (vargs String))
+    (let [proto-file-matcher (.getPathMatcher proto-jar-fs (str "glob:" proto-path "**.proto"))
+          src-path (.getPath proto-jar-fs "/" (vargs String))
           tgt-path (Files/createTempDirectory
                      "lein-protoc"
                      (vargs FileAttribute))
@@ -269,33 +270,35 @@
         src-path
         (proxy [SimpleFileVisitor] []
           (preVisitDirectory [dir-path attrs]
-            (when (.startsWith dir-path "/google")
+            (when (.startsWith dir-path proto-path)
               (let [target-dir (resolve-mismatched tgt-path src-path dir-path)]
                 (when (Files/notExists target-dir (vargs LinkOption))
                   (Files/createDirectories target-dir (vargs FileAttribute))
                   (-> target-dir .toFile .deleteOnExit))))
             FileVisitResult/CONTINUE)
           (visitFile [file attrs]
-            (when (.startsWith file "/google")
+            (when (.matches proto-file-matcher file)
               (let [tgt-file-path (resolve-mismatched tgt-path src-path file)]
                 (Files/copy file tgt-file-path (vargs CopyOption))
                 (-> tgt-file-path .toFile .deleteOnExit)))
             FileVisitResult/CONTINUE)))
       tgt-file)))
 
-(def proto-jar-regex
-  ".*com[\\/|\\\\]google[\\/|\\\\]protobuf[\\/|\\\\]protobuf-java[\\/|\\\\].*")
+(defn resolve-classpath-jar-for-dep
+  [project dep]
+  (let [clz-path (leiningen.core.classpath/get-classpath project)
+        [group artifact] (string/split (str dep) #"/")
+        path-components (conj (string/split group #"\\.") artifact)
+        path-regex (str ".*" (string/join (interleave path-components (repeat "[\\/|\\\\]"))) ".*")]
+    (first (filter #(.matches % path-regex) clz-path))))
 
 (defn resolve-builtin-proto!
   "If the project.clj includes the `com.google.protobuf/protobuf-java`
   dependency, then we unpack it to a temporary location to use during
   compilation in order to make the builtin proto files available."
   [project]
-  (if-let [proto-jar (->> project
-                          leiningen.core.classpath/get-classpath
-                          (filter #(.matches % proto-jar-regex))
-                          first)]
-    (-> proto-jar unpack-jar! .getAbsolutePath)
+  (if-let [proto-jar (resolve-classpath-jar-for-dep project "com.google.protobuf/protobuf-java")]
+    (-> proto-jar (unpack-jar! "/google") .getAbsolutePath)
     (main/info
       (str "The `com.google.protobuf/protobuf-java` dependency is not on "
            "the classpath so any Google standard proto files will not "
@@ -353,11 +356,23 @@
      (resolve-protoc-grpc!
        (or (:version protoc-grpc) +protoc-grpc-version-default+)))})
 
+(defn paths-for-dep
+  [[dep source-path] project]
+  (if-let [dep-jar (resolve-classpath-jar-for-dep project dep)]
+    (unpack-jar! dep-jar (or source-path "/"))
+    (main/abort "Unable to include proto files for missing dependency" dep)))
+
+(defn dep-source-paths
+  [{:keys [proto-source-deps] :as project}]
+  (mapv #(paths-for-dep % project) proto-source-deps))
+
 (defn all-source-paths
   [{:keys [proto-source-paths] :as project}]
   {:proto-source-paths
    (mapv (partial qualify-path project)
          (or proto-source-paths +proto-source-paths-default+))
+   :proto-dep-paths
+   (dep-source-paths project)
    :builtin-proto-path
    (resolve-builtin-proto! project)})
 
