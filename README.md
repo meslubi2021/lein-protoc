@@ -13,7 +13,7 @@ build environments.
 
 ## Usage
 
-Put `[lein-protoc "0.4.2"]` into the `:plugins` vector of your project.clj.
+Put `[lein-protoc "0.5.0"]` into the `:plugins` vector of your project.clj.
 
 The following options can be configured in the project.clj:
 
