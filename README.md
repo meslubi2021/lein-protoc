@@ -24,6 +24,7 @@ The following options can be configured in the project.clj:
   - `:version` version number for gRPC codegen. Defaults to `"1.6.1"`.
   - `:target-path` absolute path or path relative to the project root where the sources should be generated. Defaults to the `:proto-target-path`
 - `:protoc-timeout` timeout value in seconds for the compilation process. Defaults to `60`
+- `:proto-source-deps` vector of project dependencies to include proto files from. Can optionally include a prefix path with the dependency. Defaults to `[]`. Example `:proto-source-deps [[foo.bar/lib "/resources/proto"] [zip/ping-lib]`.
 
 The plugin hooks to the `javac` task so that sources will be generated prior to java compilation.
 Alternatively, the sources can be generated independently with:
