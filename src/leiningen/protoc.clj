@@ -197,14 +197,25 @@
     (name (if (= arch :x86) :x86_32 arch))
     (throw (Exception. "Leiningen failed to detect the processor architecture"))))
 
+(defn resolve-classifier
+  "Versions of com.google.protobuf/protoc prior to 3.17.3 don't ship binaries
+   for osx-aarch_64. However, machines with that architecture are capable of
+   using the x86_64 variant of protoc using emulation."
+  [os arch version]
+  (if (and (= "osx" os)
+           (= "aarch_64" arch)
+           (not (leiningen.core.main/version-satisfies? version "3.17.3")))
+    "osx-x86_64"
+    (str os "-" arch)))
+
 (defn resolve!
   "Resolves the Google Protocol Buffers code generation artifact+version in the
   local maven repository if it exists or downloads from Maven Central"
   [artifact protoc-version]
-  (let [classifier  (str (get-os) "-" (get-arch))
-        version     (if (= :latest protoc-version)
+  (let [version     (if (= :latest protoc-version)
                       (latest-version artifact)
                       protoc-version)
+        classifier  (resolve-classifier (get-os) (get-arch) version)
         coordinates [artifact version :classifier classifier :extension "exe"]]
     (aether/resolve-artifacts :coordinates [coordinates])
     coordinates))
