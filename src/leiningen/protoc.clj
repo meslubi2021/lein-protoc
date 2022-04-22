@@ -187,13 +187,15 @@
 
 (defn get-os
   []
-  (let [os (leiningen.core.utils/get-os)]
-    (name (if (= os :macosx) :osx os))))
+  (if-let [os (leiningen.core.utils/get-os)]
+    (name (if (= os :macosx) :osx os))
+    (throw (Exception. "Leiningen failed to identify the OS"))))
 
 (defn get-arch
   []
-  (let [arch (leiningen.core.utils/get-arch)]
-    (name (if (= arch :x86) :x86_32 arch))))
+  (if-let [arch (leiningen.core.utils/get-arch)]
+    (name (if (= arch :x86) :x86_32 arch))
+    (throw (Exception. "Leiningen failed to detect the processor architecture"))))
 
 (defn resolve!
   "Resolves the Google Protocol Buffers code generation artifact+version in the
