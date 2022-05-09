@@ -1,3 +1,5 @@
+:warning: This repo is not actively maintained.
+
 # lein-protoc
 
 [![Build Status](https://travis-ci.org/LiaisonTechnologies/lein-protoc.svg?branch=master)](https://travis-ci.org/LiaisonTechnologies/lein-protoc)
