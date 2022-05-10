@@ -8,10 +8,10 @@ executors:
 jobs:
   lint:
     docker:
-      - image: cljkondo/clj-kondo:2021.02.13
+      - image: cljkondo/clj-kondo:2022.04.25
     steps:
       - checkout
-      - run: clj-kondo --lint .
+      - run: clj-kondo --fail-level error --lint .
 
   test:
     executor: clojure
