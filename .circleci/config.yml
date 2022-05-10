@@ -1,0 +1,47 @@
+version: 2.1
+
+executors:
+  clojure:
+    docker:
+      - image: circleci/clojure:lein
+
+jobs:
+  lint:
+    docker:
+      - image: cljkondo/clj-kondo:2021.02.13
+    steps:
+      - checkout
+      - run: clj-kondo --lint .
+
+  test:
+    executor: clojure
+    steps:
+      - checkout
+      - run: lein test-ci
+      - store_test_results:
+          path: target/test-results
+
+  publish:
+    executor: clojure
+    steps:
+      - checkout
+      - run:
+          name: Download dependencies
+          command: lein deps
+      - run:
+          name: Publish to clojars
+          command: lein deploy clojars
+
+workflows:
+  build-test:
+    jobs:
+      - lint
+      - test
+      - publish:
+          context: clojars-publish
+          requires:
+            - test
+          filters:
+            branches:
+              only:
+                - main
