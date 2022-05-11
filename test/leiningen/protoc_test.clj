@@ -1,6 +1,7 @@
 (ns leiningen.protoc-test
   (:require [leiningen.protoc :as lp]
             [leiningen.core.project :as lcp]
+            [leiningen.core.utils :as lcu]
             [clojure.java.io :as io]
             [clojure.test :as t]))
 
@@ -60,3 +61,64 @@
       (with-open [proto-jar-fs ^java.nio.file.FileSystem (lp/get-jar-fs path)]
         (with-open [second-proto-jar-fs ^java.nio.file.FileSystem (lp/get-jar-fs path)]
           (t/is (= proto-jar-fs second-proto-jar-fs)))))))
+
+(t/deftest resolve-classifier-test
+  (t/are [version os arch classifier]
+         (= classifier (lp/resolve-classifier os arch version))
+
+    "3.0.0-beta-2" "windows" "x86_32"   "windows-x86_32"
+    "3.0.0-beta-2" "windows" "x86_64"   "windows-x86_64"
+    "3.0.0-beta-2" "linux"   "x86_32"   "linux-x86_32"
+    "3.0.0-beta-2" "linux"   "x86_64"   "linux-x86_64"
+    "3.0.0-beta-2" "osx"     "x86_64"   "osx-x86_64"
+    "3.0.0-beta-2" "osx"     "aarch_64" "osx-x86_64"     ; Redirected to x86_64
+    "3.3.0"        "windows" "x86_32"   "windows-x86_32"
+    "3.3.0"        "windows" "x86_64"   "windows-x86_64"
+    "3.3.0"        "linux"   "x86_32"   "linux-x86_32"
+    "3.3.0"        "linux"   "x86_64"   "linux-x86_64"
+    "3.3.0"        "osx"     "x86_64"   "osx-x86_64"
+    "3.3.0"        "osx"     "aarch_64" "osx-x86_64"     ; Redirected to x86_64
+    "3.17.2"       "windows" "x86_32"   "windows-x86_32"
+    "3.17.2"       "windows" "x86_64"   "windows-x86_64"
+    "3.17.2"       "linux"   "x86_32"   "linux-x86_32"
+    "3.17.2"       "linux"   "x86_64"   "linux-x86_64"
+    "3.17.2"       "osx"     "x86_64"   "osx-x86_64"
+    "3.17.2"       "osx"     "aarch_64" "osx-x86_64"     ; Redirected to x86_64
+    "3.17.3"       "windows" "x86_32"   "windows-x86_32"
+    "3.17.3"       "windows" "x86_64"   "windows-x86_64"
+    "3.17.3"       "linux"   "x86_32"   "linux-x86_32"
+    "3.17.3"       "linux"   "x86_64"   "linux-x86_64"
+    "3.17.3"       "osx"     "x86_64"   "osx-x86_64"
+    "3.17.3"       "osx"     "aarch_64" "osx-aarch_64"   ; Uses native aarch_64
+    "3.18.0"       "windows" "x86_32"   "windows-x86_32"
+    "3.18.0"       "windows" "x86_64"   "windows-x86_64"
+    "3.18.0"       "linux"   "x86_32"   "linux-x86_32"
+    "3.18.0"       "linux"   "x86_64"   "linux-x86_64"
+    "3.18.0"       "osx"     "x86_64"   "osx-x86_64"
+    "3.18.0"       "osx"     "aarch_64" "osx-aarch_64"   ; Uses native aarch_64
+    "4.0.0-rc-1"   "windows" "x86_32"   "windows-x86_32"
+    "4.0.0-rc-1"   "windows" "x86_64"   "windows-x86_64"
+    "4.0.0-rc-1"   "linux"   "x86_32"   "linux-x86_32"
+    "4.0.0-rc-1"   "linux"   "x86_64"   "linux-x86_64"
+    "4.0.0-rc-1"   "osx"     "x86_64"   "osx-x86_64"
+    "4.0.0-rc-1"   "osx"     "aarch_64" "osx-aarch_64"   ; Uses native aarch_64
+    ))
+
+(t/deftest resolve-protoc!-works-with-intel-and-arm-macs
+  (with-redefs [lcu/get-os (constantly :macosx)]
+    (t/testing "Old version on an Intel Mac"
+      (with-redefs [lcu/get-arch (constantly :x86_64)]
+        (t/is (= "protoc-3.6.0-osx-x86_64.exe"
+                 (.getName (io/file (lp/resolve-protoc! "3.6.0")))))))
+    (t/testing "Old version on an M1 Mac"
+      (with-redefs [lcu/get-arch (constantly :aarch_64)]
+        (t/is (= "protoc-3.6.0-osx-x86_64.exe"
+                 (.getName (io/file (lp/resolve-protoc! "3.6.0")))))))
+    (t/testing "New version on an Intel Mac"
+      (with-redefs [lcu/get-arch (constantly :x86_64)]
+        (t/is (= "protoc-3.20.0-osx-x86_64.exe"
+                 (.getName (io/file (lp/resolve-protoc! "3.20.0")))))))
+    (t/testing "New version on an M1 Mac"
+      (with-redefs [lcu/get-arch (constantly :aarch_64)]
+        (t/is (= "protoc-3.20.0-osx-aarch_64.exe"
+                 (.getName (io/file (lp/resolve-protoc! "3.20.0")))))))))
