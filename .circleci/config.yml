@@ -1,0 +1,48 @@
+version: 2.1
+
+executors:
+  clojure:
+    docker:
+      - image: circleci/clojure:lein
+
+jobs:
+  lint:
+    docker:
+      - image: cljkondo/clj-kondo:2022.04.25
+    steps:
+      - checkout
+      - run: clj-kondo --fail-level error --lint .
+
+  test:
+    executor: clojure
+    steps:
+      - checkout
+      - run: lein test-ci
+      - store_test_results:
+          path: target/test-results
+
+  publish:
+    executor: clojure
+    steps:
+      - checkout
+      - run:
+          name: Download dependencies
+          command: lein deps
+      - run:
+          name: Publish to clojars
+          command: lein deploy
+
+workflows:
+  build-test:
+    jobs:
+      - lint
+      - test
+      - publish:
+          context: clojars-publish
+          requires:
+            - lint
+            - test
+          filters:
+            branches:
+              only:
+                - main
