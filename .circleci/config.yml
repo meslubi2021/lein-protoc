@@ -30,7 +30,7 @@ jobs:
           command: lein deps
       - run:
           name: Publish to clojars
-          command: lein deploy clojars
+          command: lein deploy
 
 workflows:
   build-test:
