@@ -100,27 +100,31 @@
   [{:keys [protoc-exe protoc-grpc-exe]}
    {:keys [proto-source-paths builtin-proto-path proto-dep-paths]}
    {:keys [proto-target-path grpc-target-path]}]
-  (let [all-srcs        (concat proto-dep-paths (if builtin-proto-path
-                                                  (conj proto-source-paths builtin-proto-path)
-                                                  proto-source-paths))
-        src-paths-args  (map str->src-path-arg all-srcs)
-        target-path-arg (str "--java_out="
-                             (resolve-target-path! proto-target-path))
-        grpc-plugin-arg (when protoc-grpc-exe
-                          (str "--plugin=protoc-gen-grpc-java="
-                               protoc-grpc-exe))
-        grpc-path-arg   (when protoc-grpc-exe
-                          (str "--grpc-java_out="
-                               (resolve-target-path! grpc-target-path)))
-        proto-files     (mapcat proto-files proto-source-paths)]
-    (when (and (not-empty proto-files)
-               (outdated-protos? proto-source-paths proto-target-path))
-      (main/info "Compiling" (count proto-files) "proto files:" proto-files)
-      (->> (concat [protoc-exe target-path-arg grpc-plugin-arg grpc-path-arg]
-                   src-paths-args
-                   proto-files)
-           (remove nil?)
-           vec))))
+  (if protoc-exe
+    (let [all-srcs        (concat proto-dep-paths (if builtin-proto-path
+                                                    (conj proto-source-paths builtin-proto-path)
+                                                    proto-source-paths))
+          src-paths-args  (map str->src-path-arg all-srcs)
+          target-path-arg (str "--java_out="
+                               (resolve-target-path! proto-target-path))
+          grpc-plugin-arg (when protoc-grpc-exe
+                            (str "--plugin=protoc-gen-grpc-java="
+                                 protoc-grpc-exe))
+          grpc-path-arg   (when protoc-grpc-exe
+                            (str "--grpc-java_out="
+                                 (resolve-target-path! grpc-target-path)))
+          proto-files     (mapcat proto-files proto-source-paths)]
+      (when (and (not-empty proto-files)
+                 (outdated-protos? proto-source-paths proto-target-path))
+        (main/info "Compiling" (count proto-files) "proto files:" proto-files)
+        (->> (concat [protoc-exe target-path-arg grpc-plugin-arg grpc-path-arg]
+                     src-paths-args
+                     proto-files)
+             (remove nil?)
+             vec)))
+    (do
+     (print-warn-msg "Failed to find a suitable version of protoc")
+     nil)))
 
 (defn parse-response
   [process]
@@ -183,22 +187,35 @@
 
 (defn get-os
   []
-  (let [os (leiningen.core.utils/get-os)]
-    (name (if (= os :macosx) :osx os))))
+  (if-let [os (leiningen.core.utils/get-os)]
+    (name (if (= os :macosx) :osx os))
+    (throw (Exception. "Leiningen failed to identify the OS"))))
 
 (defn get-arch
   []
-  (let [arch (leiningen.core.utils/get-arch)]
-    (name (if (= arch :x86) :x86_32 arch))))
+  (if-let [arch (leiningen.core.utils/get-arch)]
+    (name (if (= arch :x86) :x86_32 arch))
+    (throw (Exception. "Leiningen failed to detect the processor architecture"))))
+
+(defn resolve-classifier
+  "Versions of com.google.protobuf/protoc prior to 3.17.3 don't ship binaries
+   for osx-aarch_64. However, machines with that architecture are capable of
+   using the x86_64 variant of protoc using emulation."
+  [os arch version]
+  (if (and (= "osx" os)
+           (= "aarch_64" arch)
+           (not (leiningen.core.main/version-satisfies? version "3.17.3")))
+    "osx-x86_64"
+    (str os "-" arch)))
 
 (defn resolve!
   "Resolves the Google Protocol Buffers code generation artifact+version in the
   local maven repository if it exists or downloads from Maven Central"
   [artifact protoc-version]
-  (let [classifier  (str (get-os) "-" (get-arch))
-        version     (if (= :latest protoc-version)
+  (let [version     (if (= :latest protoc-version)
                       (latest-version artifact)
                       protoc-version)
+        classifier  (resolve-classifier (get-os) (get-arch) version)
         coordinates [artifact version :classifier classifier :extension "exe"]]
     (aether/resolve-artifacts :coordinates [coordinates])
     coordinates))
