@@ -15,7 +15,7 @@ build environments.
 
 ## Usage
 
-Put `[lein-protoc "0.5.0"]` into the `:plugins` vector of your project.clj.
+Put `[com.circleci/lein-protoc "0.6.0"]` into the `:plugins` vector of your project.clj.
 
 The following options can be configured in the project.clj:
 
@@ -33,9 +33,17 @@ Alternatively, the sources can be generated independently with:
 
     $ lein protoc
 
-## License
+## Releasing
 
-Copyright © 2017 Liaison Technologies
+lein-protoc is pushed to [clojars](https://clojars.org/com.circleci/lein-protoc).
+
+The following should be updated on the `main` branch if there are new releases:
+
+- `project.clj` - version
+- `README.md` - dependency coordinates
+- `CHANGELOG.md` - summary of changes
+
+## License
 
 Distributed under the Eclipse Public License either version 1.0 or (at
 your option) any later version.

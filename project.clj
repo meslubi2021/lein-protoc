@@ -1,4 +1,4 @@
-(defproject com.circleci/lein-protoc "0.1.0-SNAPSHOT"
+(defproject com.circleci/lein-protoc "0.6.0"
   :description "Leiningen plugin for compiling Protocol Buffers"
   :url "https://github.com/LiaisonTechnologies/lein-protoc"
   :license {:name "Eclipse Public License"
